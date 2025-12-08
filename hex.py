@@ -90,12 +90,15 @@ class HexCoverage(Method):
         self.height = float(height) if height is not None else float(default_extent[1])
 
         # Extract scalar lengthscale and prior variance
-        self.lengthscale = self._extract_kernel_scalar(
-            self.kernel, "lengthscales", "lengthscale"
-        )
-        self.prior_variance = self._extract_kernel_scalar(
-            self.kernel, "variance", "prior variance"
-        )
+        self.lengthscale = kwargs.get('lengthscale', None)
+        self.prior_variance = kwargs.get('variance', None)
+        if self.lengthscale is None and self.prior_variance is None:
+            self.lengthscale = self._extract_kernel_scalar(
+                self.kernel, "lengthscales"
+            )
+            self.prior_variance = self._extract_kernel_scalar(
+                self.kernel, "variance"
+            )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -105,7 +108,6 @@ class HexCoverage(Method):
     def _extract_kernel_scalar(
         kernel: gpflow.kernels.Kernel,
         attr: str,
-        human_name: str
     ) -> float:
         """
         Extract a scalar float from a gpflow kernel attribute (e.g. lengthscales
@@ -117,8 +119,6 @@ class HexCoverage(Method):
             Kernel object with the desired attribute.
         attr : str
             Name of the attribute on the kernel (e.g. 'lengthscales', 'variance').
-        human_name : str
-            Human-readable name for error messages.
 
         Returns
         -------
@@ -127,8 +127,7 @@ class HexCoverage(Method):
         """
         if not hasattr(kernel, attr):
             raise ValueError(
-                f"HexCoverage requires a kernel with a '{attr}' attribute "
-                f"(for {human_name})."
+                f"HexCoverage requires a kernel with a '{attr}' attribute."
             )
 
         value = getattr(kernel, attr)
