@@ -341,9 +341,20 @@ class HexCoverage(Method):
         """
         fovs = []
         for pt in X_sol[0]:
-            fov = geometry.Point(pt[0], pt[1])
-            fov = fov.buffer(radius)
+            fov = HexCoverage._create_regular_hexagon(pt[0], pt[1], radius)
             fovs.append(fov)
         return fovs
+    
+    @staticmethod
+    def _create_regular_hexagon(center_x, center_y, side_length):
+        """Creates a regular hexagon polygon centered at (center_x, center_y)."""
+        coords = []
+        for i in range(6):
+            angle_deg = 60 * i # Start at 0 degrees for the first point
+            angle_rad = np.radians(angle_deg)
+            x = center_x + side_length * np.cos(angle_rad)
+            y = center_y + side_length * np.sin(angle_rad)
+            coords.append((x, y))
+        return geometry.Polygon(coords)
     
 METHODS['HexCoverage'] = HexCoverage
