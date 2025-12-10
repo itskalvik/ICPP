@@ -2,12 +2,18 @@ from sgptools.methods import *
 
 class HexCoverage(Method):
     """
-    Hexagonal lattice coverage based on kernel hyperparameters.
+    Hexagonal lattice coverage based on GP kernel hyperparameters.
 
     This method constructs a deterministic hexagonal tiling over a rectangular
-    environment such that the GP posterior variance at every point in the
+    2D environment such that the GP posterior variance at every point in the
     environment is bounded by a user-specified threshold (under the same
     sufficient condition used in the minimal HexCover implementation).
+        
+    Refer to the following paper for more details:
+        - Approximation Algorithms for Robot Tours in Random Fields with 
+        Guaranteed Estimation Accuracy [Dutta et al., 2023]
+
+    Implementation based on Dr. Shamak Dutta's original code.
 
     Notes
     -----
@@ -85,69 +91,76 @@ class HexCoverage(Method):
         maxs = self.X_objective[:, :2].max(axis=0)
         default_extent = maxs - mins
 
-        self.origin = mins  # shift from [0, W]x[0, H] to actual coords
+        self.origin = mins  # shift from [0, W] x [0, H] to actual coords
         self.width = float(width) if width is not None else float(default_extent[0])
         self.height = float(height) if height is not None else float(default_extent[1])
 
         # Extract scalar lengthscale and prior variance
-        self.lengthscale = kwargs.get('lengthscale', None)
-        self.prior_variance = kwargs.get('variance', None)
-        if self.lengthscale is None and self.prior_variance is None:
-            self.lengthscale = self._extract_kernel_scalar(
-                self.kernel, "lengthscales"
-            )
-            self.prior_variance = self._extract_kernel_scalar(
-                self.kernel, "variance"
-            )
+        self._extract_kernel_scalars()
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _extract_kernel_scalar(
-        kernel: gpflow.kernels.Kernel,
-        attr: str,
-    ) -> float:
+    def _extract_kernel_scalars(self) -> float:
         """
-        Extract a scalar float from a gpflow kernel attribute (e.g. lengthscales
-        or variance). If the underlying value is vector-valued, returns the mean.
+        Extract scalar kernel hyperparameters and store them on the instance.
+
+        This method computes and stores:
+        - `self.lengthscale`: a scalar lengthscale (minimum across dimensions
+          or locations if needed).
+        - `self.prior_variance`: a scalar prior variance.
+
+        The implementation handles both stationary and certain non-stationary
+        kernels (with a `get_lengthscales` method).
+        """
+        # Non-stationary kernel
+        if hasattr(self.kernel, 'get_lengthscales'):
+            lengthscale = self.kernel.get_lengthscales(self.X_objective)
+            lengthscale = np.min(lengthscale)
+            prior_variance = self.kernel(self.X_objective,
+                                         self.X_objective).numpy().max()
+        else:  # Stationary kernel
+            lengthscale = float(self.kernel.lengthscales.numpy())
+            prior_variance = float(self.kernel.variance.numpy())
+
+        self.lengthscale = lengthscale
+        self.prior_variance = prior_variance
+
+    def _compute_rmin(self, var_threshold: Optional[float] = None) -> float:
+        """
+        Compute the sufficient radius $r_{\\min}$ for the hexagonal tiling.
+
+        The radius is computed using the same sufficient condition as in the
+        minimal HexCover implementation:
+
+        $r_{\\min} = L \\sqrt{-\\log\\left(
+            \\frac{(\\sigma_0^2 - \\Delta)(\\sigma_0^2 + \\sigma^2)}
+                 {\\sigma_0^4}
+        \\right)}$,
+
+        where
+        - $L$ is the kernel lengthscale,
+        - $\\sigma_0^2$ is the prior variance,
+        - $\\sigma^2$ is the noise variance, and
+        - $\\Delta$ is the allowed posterior variance threshold.
 
         Parameters
         ----------
-        kernel : gpflow.kernels.Kernel
-            Kernel object with the desired attribute.
-        attr : str
-            Name of the attribute on the kernel (e.g. 'lengthscales', 'variance').
+        var_threshold : float or None
+            Posterior variance threshold :math:`\\Delta`. If None, uses the
+            current value stored in `self.var_threshold`.
 
         Returns
         -------
         float
-            Scalar value for the requested kernel attribute.
-        """
-        if not hasattr(kernel, attr):
-            raise ValueError(
-                f"HexCoverage requires a kernel with a '{attr}' attribute."
-            )
+            The sufficient radius :math:`r_{\\min}` for the hexagonal tiling.
 
-        value = getattr(kernel, attr)
-        try:
-            value = value.numpy()
-        except AttributeError:
-            pass
-
-        value = np.asarray(value, dtype=float)
-        return float(value.mean())
-
-    def _compute_rmin(self, var_threshold: Optional[float] = None) -> float:
-        """
-        Compute the sufficient radius r_min for the hexagonal tiling, following
-        the same condition as in the minimal HexCover implementation:
-
-            r_min = L * sqrt(-log((σ₀² - Δ)(σ₀² + σ²) / σ₀⁴))
-
-        where L is the kernel lengthscale, σ₀² is the prior variance, σ² is the
-        noise variance, and Δ is the allowed posterior variance threshold.
+        Raises
+        ------
+        ValueError
+            If the computed term inside the logarithm is not in (0, 1),
+            which indicates incompatible hyperparameters and/or threshold.
         """
         if var_threshold is None:
             var_threshold = self.var_threshold
@@ -171,18 +184,25 @@ class HexCoverage(Method):
                           radius: float,
                           fill_edge: bool = True) -> np.ndarray:
         """
-        Hexagonal tiling helper, ported from minimal.py's `hexagonal_tiling`.
+        Generate a hexagonal tiling over a rectangular region.
 
         Parameters
         ----------
         height : float
-            Height of environment in y-direction.
+            Height of the environment in the y-direction.
         width : float
-            Width of environment in x-direction.
+            Width of the environment in the x-direction.
         radius : float
-            Hexagon circumradius r_min.
-        fill_edge : bool
-            If True, adds additional centers near the environment boundary.
+            Hexagon circumradius :math:`r_{\\min}`.
+        fill_edge : bool, optional
+            If True, add additional centers near the environment boundary
+            to reduce uncovered gaps. Default is True.
+
+        Returns
+        -------
+        ndarray of shape (k, 2)
+            Array of 2D points representing hexagon centers in local
+            `[0, width] × [0, height]` coordinates.
         """
         hs = 3.0 * radius
         vs = np.sqrt(3.0) * radius
@@ -247,36 +267,40 @@ class HexCoverage(Method):
     def optimize(self,
                  var_threshold: Optional[float] = None,
                  return_fovs: bool = False,
+                 tsp: bool = True,
                  **kwargs: Any) -> np.ndarray:
         """
         Construct the hexagonal coverage pattern.
 
         Parameters
         ----------
-        var_threshold : float or None
-            Target posterior variance threshold Δ. If None, defaults to
-            `0.2 * variance` (following the minimal implementation where
-            `delta = 0.2 * sigma0**2`).
+        var_threshold : float or None, optional
+            Target posterior variance threshold :math:`\\Delta`. If None,
+            defaults to `0.2 * prior_variance` (following the minimal
+            implementation where `delta = 0.2 * sigma0**2`).
         return_fovs : bool, optional
             If True, also returns a list of polygonal fields of view (FoVs)
-            corresponding to the convex hull of the covered objective points
-            for each selected candidate. Default is False.
-            
+            corresponding to regular hexagons centered at the sensing
+            locations. Default is False.
+        tsp : bool, optional
+            If True, runs a TSP heuristic (`run_tsp`) to order the sensing
+            locations. Default is True.
+        **kwargs : dict
+            Additional keyword arguments passed to `run_tsp` when `tsp` is True.
+
         Returns
         -------
         X_sol : ndarray of shape (1, k, d)
-            Selected sensing locations. `k` is determined by the tiling, and
+            Selected sensing locations. `k` is determined by the tiling and
             may differ from `num_sensing`. The last dimension `d` matches
             `self.num_dim`; only the first two coordinates are used for the
             spatial layout, the remaining coordinates are zero.
 
         If `return_fovs` is True, the return value is:
 
-        -------
-        X_sol, fovs : (ndarray, list of shapely.geometry.Polygon)
-            `X_sol` as above, together with a list of buffered convex-hull FoVs
-            computed from the covered environment points for each selected
-            candidate.
+        (X_sol, fovs) : (ndarray, list of shapely.geometry.Polygon)
+            `X_sol` as above, together with a list of regular hexagonal FoVs
+            centered at each selected sensing location.
         """
         # Posterior variance threshold Δ
         if var_threshold is None:
@@ -304,7 +328,8 @@ class HexCoverage(Method):
         X_sol = np.zeros((k, self.num_dim), dtype=dtype)
         X_sol[:, :2] = centers_2d
 
-        X_sol, _ = run_tsp(X_sol, **kwargs)    
+        if tsp:
+            X_sol, _ = run_tsp(X_sol, **kwargs)
         X_sol = np.array(X_sol).reshape(self.num_robots, -1, self.num_dim)
 
         if return_fovs:
@@ -314,30 +339,25 @@ class HexCoverage(Method):
 
     def _get_fovs(self, X_sol, radius):
         """
-        Compute polygonal fields of view (FoVs) from coverage masks.
+        Construct polygonal fields of view (FoVs) for the sensing locations.
 
-        For each selected candidate, this method takes the subset of objective
-        points it covers, forms their convex hull, and then applies a
-        morphological buffer. The result is a list of polygons that roughly
-        characterize the spatial footprint of each sensing location.
+        For each selected sensing location, this method creates a regular
+        hexagon centered at the sensing point with the given radius. The
+        resulting polygons approximate the spatial footprint of each
+        sensing location.
 
         Parameters
         ----------
-        coverages : 2D ndarray of bool, shape (k, n)
-            Coverage masks for the selected candidates, where `k` is the number
-            of selected locations and `n` is the number of environment points.
-            Each row corresponds to one candidate and indicates which objective
-            points are covered.
-        buffer : float, optional
-            Buffer radius passed to `Polygon.buffer`. Controls how much
-            the convex hull is expanded. Default is 0.5.
+        X_sol : ndarray of shape (1, k, d)
+            Sensing locations returned by :meth:`optimize`. Only the first
+            two coordinates of each point are used.
+        radius : float
+            Hexagon side length (or circumradius) used to construct each FoV.
 
         Returns
         -------
         fovs : list of shapely.geometry.Polygon
-            List of buffered convex-hull polygons, one per candidate for which
-            at least four objective points are covered. Candidates covering
-            fewer than four points are skipped.
+            List of regular hexagonal polygons, one per sensing location.
         """
         fovs = []
         for pt in X_sol[0]:
@@ -347,10 +367,27 @@ class HexCoverage(Method):
     
     @staticmethod
     def _create_regular_hexagon(center_x, center_y, side_length):
-        """Creates a regular hexagon polygon centered at (center_x, center_y)."""
+        """
+        Create a regular hexagon polygon centered at a given point.
+
+        Parameters
+        ----------
+        center_x : float
+            x-coordinate of the hexagon center.
+        center_y : float
+            y-coordinate of the hexagon center.
+        side_length : float
+            Side length (and effective radius) of the hexagon.
+
+        Returns
+        -------
+        shapely.geometry.Polygon
+            Polygon representing the regular hexagon.
+        """
         coords = []
         for i in range(6):
-            angle_deg = 60 * i # Start at 0 degrees for the first point
+            # Start at 0 degrees for the first vertex and move counter-clockwise
+            angle_deg = 60 * i
             angle_rad = np.radians(angle_deg)
             x = center_x + side_length * np.cos(angle_rad)
             y = center_y + side_length * np.sin(angle_rad)
