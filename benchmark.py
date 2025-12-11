@@ -95,14 +95,11 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="benchmark_results",
-        help="Directory where plots and JSON results will be saved."
-    )
-    parser.add_argument(
-        "--results-json",
-        type=str,
-        default="results.json",
-        help="Name of the JSON file to write inside output-dir."
+        default="./",
+        help=(
+            "Base directory where plots and JSON results will be saved. "
+            "Final output directory will be <output-dir>/<dataset_name>/<kernel>."
+        ),
     )
 
     return parser.parse_args()
@@ -110,7 +107,9 @@ def parse_args():
 
 def main():
     args = parse_args()
-    os.makedirs(args.output_dir, exist_ok=True)
+    dataset_stem = os.path.splitext(os.path.basename(args.dataset))[0]
+    output_dir = os.path.join(args.output_dir, dataset_stem, args.kernel)
+    os.makedirs(output_dir, exist_ok=True)
 
     # -----------------------------------------------------
     # Load data and create Dataset
@@ -205,7 +204,7 @@ def main():
         )
 
         lengthscale_fig_path = os.path.join(
-            args.output_dir,
+            output_dir,
             "lengthscale_groundtruth.png"
         )
         fig.savefig(lengthscale_fig_path, dpi=300)
@@ -387,7 +386,7 @@ def main():
 
             ratio_str = str(target_var_ratio).replace(".", "p")
             fig_filename = os.path.join(
-                args.output_dir,
+                output_dir,
                 f"{method}_ratio{ratio_str}.png"
             )
             fig.savefig(fig_filename, dpi=300)
@@ -420,7 +419,7 @@ def main():
     # ---------------------------------------------------------
     # Save JSON
     # ---------------------------------------------------------
-    json_path = os.path.join(args.output_dir, args.results_json)
+    json_path = os.path.join(output_dir, "results.json")
     # Ensure everything is JSON-serializable
     def _convert(o):
         if isinstance(o, (np.generic,)):
