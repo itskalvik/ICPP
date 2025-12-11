@@ -299,6 +299,7 @@ def main():
                 max_steps=0,
                 return_model=True,
                 verbose=False,
+                force_gp=True
             )
 
             mean, var = model_sol.predict_f(X_grid)
