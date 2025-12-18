@@ -7,11 +7,19 @@ import numpy as np
 
 # --- NO TYPE 3 FONTS IN PDF OUTPUT ---
 import matplotlib as mpl
-mpl.rcParams["pdf.fonttype"] = 42   # Embed TrueType fonts (Type 42), not Type 3
+mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["mathtext.fontset"] = "dejavusans"
 mpl.rcParams["text.usetex"] = False
+
+# Font sizes
+mpl.rcParams["font.size"] = 14
+mpl.rcParams["axes.titlesize"] = 14
+mpl.rcParams["axes.labelsize"] = 14
+mpl.rcParams["xtick.labelsize"] = 14
+mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["legend.fontsize"] = 14
 # -------------------------------------
 
 import matplotlib.pyplot as plt
