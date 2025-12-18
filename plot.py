@@ -1,52 +1,34 @@
 #!/usr/bin/env python3
 import json
 import argparse
-from collections import defaultdict
+import os
 
 import numpy as np
+
+# --- NO TYPE 3 FONTS IN PDF OUTPUT ---
+import matplotlib as mpl
+mpl.rcParams["pdf.fonttype"] = 42   # Embed TrueType fonts (Type 42), not Type 3
+mpl.rcParams["ps.fonttype"] = 42
+mpl.rcParams["font.family"] = "DejaVu Sans"
+mpl.rcParams["mathtext.fontset"] = "dejavusans"
+mpl.rcParams["text.usetex"] = False
+# -------------------------------------
+
 import matplotlib.pyplot as plt
 
 
 def load_results(path):
-    """Load benchmark results JSON."""
     with open(path, "r") as f:
         return json.load(f)
 
 
 def prepare_data(data):
-    """
-    Organize runs by method and variance ratio and extract metrics.
-
-    Expects a structure like:
-      {
-        "variance_ratios": [...],
-        "methods": [...],
-        "runs": [
-           {
-             "method": ...,
-             "variance_ratio": ...,
-             "num_placements": ...,
-             "max_posterior_var": ...,
-             "target_var_threshold": ...,
-             "mse": ...,
-             "smse": ...,
-             "runtime_sec": ...,
-             "distance_m": ...
-           },
-           ...
-        ]
-      }
-    """
     runs = data["runs"]
-
     methods = sorted({r["method"] for r in runs})
-    # Use all variance ratios present in the runs to be robust
     variance_ratios = sorted({float(r["variance_ratio"]) for r in runs})
 
-    # Map (method, variance_ratio) -> run dict
     lookup = {(r["method"], float(r["variance_ratio"])): r for r in runs}
 
-    # Per-method metric arrays aligned with variance_ratios
     per_method = {
         m: {
             "variance_ratio": [],
@@ -60,8 +42,6 @@ def prepare_data(data):
         for m in methods
     }
 
-    # Target variance threshold is the same for all methods at a given ratio;
-    # grab it once per ratio.
     target_var_by_ratio = {}
     for vr in variance_ratios:
         for m in methods:
@@ -70,7 +50,6 @@ def prepare_data(data):
                 target_var_by_ratio[vr] = run["target_var_threshold"]
                 break
 
-    # Fill metric arrays; if a method is missing a ratio, use NaN
     for m in methods:
         for vr in variance_ratios:
             run = lookup.get((m, vr))
@@ -93,9 +72,19 @@ def prepare_data(data):
     return methods, variance_ratios, per_method, target_var_by_ratio
 
 
+def _sanitize(s: str) -> str:
+    """Make a safe filename token."""
+    return "".join(c if (c.isalnum() or c in "-_") else "_" for c in s)
+
+
 def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
-                 output_path=None):
-    """Create 6 subplots of metrics vs variance ratio for each method."""
+                 output_base="metrics_vs_ratio.pdf"):
+    """
+    Create one figure per metric, save each to its own PDF, then show.
+    output_base can be:
+      - a directory (existing or not): outputs saved inside it
+      - or a filename like 'metrics.pdf': base name used for per-metric PDFs
+    """
     metrics = [
         ("max_posterior_var", "Max posterior variance"),
         ("num_placements", "Number of placements"),
@@ -105,10 +94,23 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
         ("distance_m", "Distance (m)"),
     ]
 
-    fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharex=True)
-    axes = axes.ravel()
+    # Decide output directory + base stem
+    output_base = output_base or "metrics_vs_ratio.pdf"
+    if output_base.lower().endswith(".pdf"):
+        out_dir = os.path.dirname(output_base) or "."
+        stem = os.path.splitext(os.path.basename(output_base))[0]
+    else:
+        # treat as directory
+        out_dir = output_base
+        stem = "metrics_vs_ratio"
 
-    for ax, (key, label) in zip(axes, metrics):
+    os.makedirs(out_dir, exist_ok=True)
+
+    figures = []
+
+    for key, label in metrics:
+        fig, ax = plt.subplots(figsize=(7.5, 5.0))
+
         for method in methods:
             d = per_method[method]
             ax.plot(
@@ -116,10 +118,9 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
                 d[key],
                 marker="o",
                 linestyle="-",
-                label=method if key == "max_posterior_var" else None,
+                label=method,
             )
 
-        # Add target variance line on the max posterior variance plot
         if key == "max_posterior_var":
             target_vals = [target_var_by_ratio[vr] for vr in variance_ratios]
             ax.plot(
@@ -129,20 +130,22 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
                 linewidth=1.5,
                 label="Target variance",
             )
-            ax.legend()
 
+        ax.set_title(f"Coverage benchmark: {label} vs variance ratio")
+        ax.set_xlabel("Variance ratio")
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
+        ax.legend()
 
-    # Shared x-label for bottom row
-    axes[-2].set_xlabel("Variance ratio")
-    axes[-1].set_xlabel("Variance ratio")
+        # x-axis from largest to smallest
+        ax.invert_xaxis()
 
-    fig.suptitle("Coverage benchmark metrics vs variance ratio", fontsize=14)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.tight_layout()
 
-    if output_path is not None:
-        fig.savefig(output_path, dpi=300, bbox_inches="tight")
+        out_path = os.path.join(out_dir, f"{stem}_{_sanitize(key)}.pdf")
+        fig.savefig(out_path, bbox_inches="tight")  # rcParams ensure no Type 3 fonts
+
+        figures.append(fig)
 
     plt.show()
 
@@ -151,15 +154,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plot coverage benchmark metrics vs variance ratio."
     )
+    parser.add_argument("json_path", help="Path to the results JSON file (e.g., results.json)")
     parser.add_argument(
-        "json_path",
-        help="Path to the results JSON file (e.g., results.json)",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default=None,
-        help="Optional path to save the figure (e.g., metrics_vs_ratio.png)",
+        "-o", "--output",
+        default="metrics_vs_ratio.pdf",
+        help=(
+            "Output base for PDFs. If ends with .pdf, saves per-metric PDFs like "
+            "'<stem>_<metric>.pdf'. If a directory path, saves into that directory."
+        ),
     )
     args = parser.parse_args()
 
