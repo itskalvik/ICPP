@@ -4,9 +4,25 @@ import json
 import argparse
 from time import time
 
+# --- NO TYPE 3 FONTS IN PDF OUTPUT ---
+import matplotlib as mpl
+mpl.rcParams["pdf.fonttype"] = 42
+mpl.rcParams["ps.fonttype"] = 42
+mpl.rcParams["font.family"] = "DejaVu Sans"
+mpl.rcParams["mathtext.fontset"] = "dejavusans"
+mpl.rcParams["text.usetex"] = False
+
+# Font sizes
+mpl.rcParams["font.size"] = 14
+mpl.rcParams["axes.titlesize"] = 14
+mpl.rcParams["axes.labelsize"] = 14
+mpl.rcParams["xtick.labelsize"] = 14
+mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["legend.fontsize"] = 14
+# -------------------------------------
+
 from matplotlib.patches import Polygon as MplPolygon
 import matplotlib.pyplot as plt
-plt.rcParams['text.usetex'] = True
 
 import numpy as np
 np.random.seed(1234)
@@ -64,7 +80,7 @@ def parse_args():
         "--methods",
         type=str,
         nargs="+",
-        default=["HexCoverage", "GreedyCoverage", "GCBCoverage"],
+        default=["HexCoverage", "GreedyCoverage", "GCBCoverage", "GCBCoverage-Dist"],
         help="List of coverage methods to benchmark.",
     )
     parser.add_argument(
@@ -267,8 +283,12 @@ def main():
 
         for method in args.methods:
             print(f"Running method: {method} ...")
+            
+            kwargs = {}
+            if 'Dist' in method:
+                kwargs['distance_budget'] = distance - 20
 
-            cmodel = get_method(method)(
+            cmodel = get_method(method.split('-')[0])(
                 num_sensing=len(X_train),
                 X_objective=X_train,
                 kernel=kernel,
@@ -280,6 +300,7 @@ def main():
                 var_threshold=var_threshold,
                 return_fovs=True,
                 start_nodes=X_init[None, -1],
+                **kwargs
             )
             X_sol = X_sol[0]
             run_time = time() - s_time
@@ -371,19 +392,6 @@ def main():
             axes[2].set_xlim(axes[1].get_xlim())
             axes[2].set_ylim(axes[1].get_ylim())
 
-            suptitle = (
-                f"{method}; "
-                f"Num Placements: {len(fovs)}; "
-                f"Max Prior Var: {max_prior_var:.2f}; "
-                f"Target Var: {var_threshold:.2f}; "
-                f"Max Posterior Var: {max_post_var:.2f}; "
-                f"MSE: {mse_e:.2f}; "
-                f"SMSE: {smse_e:.2f}; "
-                f"Runtime: {run_time:.2f} s; "
-                f"Distance: {distance:.0f} m"
-            )
-            fig.suptitle(suptitle, fontsize=14)
-
             ratio_str = str(target_var_ratio).replace(".", "p")
             fig_filename = os.path.join(
                 output_dir,
@@ -412,7 +420,7 @@ def main():
                 "runtime_sec": run_time,
                 "distance_m": distance,
                 "figure": fig_filename,
-                "suptitle": suptitle,
+                "Budget": kwargs.get('distance_budget')
             }
             results["runs"].append(run_result)
 
