@@ -80,7 +80,7 @@ def parse_args():
         "--methods",
         type=str,
         nargs="+",
-        default=["HexCoverage", "GreedyCoverage", "GCBCoverage", "GCBCoverage-Dist"],
+        default=["HexCover", "GreedyCover", "GCBCover", "GCBCover-Dist"],
         help="List of coverage methods to benchmark.",
     )
     parser.add_argument(
