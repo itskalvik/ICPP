@@ -19,7 +19,7 @@ mpl.rcParams["axes.titlesize"] = 14
 mpl.rcParams["axes.labelsize"] = 14
 mpl.rcParams["xtick.labelsize"] = 14
 mpl.rcParams["ytick.labelsize"] = 14
-mpl.rcParams["legend.fontsize"] = 14
+mpl.rcParams["legend.fontsize"] = 12
 # -------------------------------------
 
 import matplotlib.pyplot as plt
@@ -121,12 +121,16 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
 
         for method in methods:
             d = per_method[method]
+            if "Dist" in method:
+                method_ = "GCBCover with distance budget"
+            else:
+                method_ = method
             ax.plot(
                 d["variance_ratio"],
                 d[key],
                 marker="o",
                 linestyle="-",
-                label=method,
+                label=method_,
             )
 
         if key == "max_posterior_var":
@@ -143,7 +147,8 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
         ax.set_xlabel("Variance ratio")
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
-        ax.legend()
+        if "Max" in label:
+            ax.legend()
 
         # x-axis from largest to smallest
         ax.invert_xaxis()
