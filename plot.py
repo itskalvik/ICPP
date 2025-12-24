@@ -85,10 +85,32 @@ def _sanitize(s: str) -> str:
     return "".join(c if (c.isalnum() or c in "-_") else "_" for c in s)
 
 
-def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
-                 output_base="metrics_vs_ratio.pdf"):
+def _dataset_folder_from_json(data: dict, json_path: str) -> str:
+    """
+    Use data["dataset"] like "./N02E021.npy" -> "N02E021" (basename, no extension).
+    Fallback: JSON filename stem.
+    """
+    ds = data.get("dataset")
+    if isinstance(ds, str) and ds.strip():
+        base = os.path.basename(ds.strip())
+        stem, _ext = os.path.splitext(base)
+        if stem:
+            return stem
+    return os.path.splitext(os.path.basename(json_path))[0]
+
+
+def plot_metrics(
+    methods,
+    variance_ratios,
+    per_method,
+    target_var_by_ratio,
+    dataset_name,
+    output_base="metrics_vs_ratio.pdf",
+):
     """
     Create one figure per metric, save each to its own PDF, then show.
+
+    Saves into: <out_dir>/<dataset_name>/
     output_base can be:
       - a directory (existing or not): outputs saved inside it
       - or a filename like 'metrics.pdf': base name used for per-metric PDFs
@@ -108,29 +130,38 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
         out_dir = os.path.dirname(output_base) or "."
         stem = os.path.splitext(os.path.basename(output_base))[0]
     else:
-        # treat as directory
         out_dir = output_base
         stem = "metrics_vs_ratio"
 
-    os.makedirs(out_dir, exist_ok=True)
+    # NEW: save into dataset-named folder
+    dataset_dir = os.path.join(out_dir, _sanitize(dataset_name))
+    os.makedirs(dataset_dir, exist_ok=True)
+
+    # NEW: style cycles to make overlaps visible (markers + linestyles)
+    marker_cycle = ["o", "s", "^", "D", "v", "P", "X", "*", "<", ">", "h", "8"]
+    linestyle_cycle = ["-", "--", "-.", ":"]
+    # A couple of helpful visibility tweaks that don't rely on color
+    common_plot_kwargs = dict(linewidth=2.0, markersize=6, markerfacecolor="none")
 
     figures = []
 
     for key, label in metrics:
         fig, ax = plt.subplots(figsize=(7.5, 5.0))
 
-        for method in methods:
+        for i, method in enumerate(methods):
             d = per_method[method]
             if "Dist" in method:
                 method_ = "GCBCover with distance budget"
             else:
                 method_ = method
+
             ax.plot(
                 d["variance_ratio"],
                 d[key],
-                marker="o",
-                linestyle="-",
+                marker=marker_cycle[i % len(marker_cycle)],
+                linestyle=linestyle_cycle[i % len(linestyle_cycle)],
                 label=method_,
+                **common_plot_kwargs,
             )
 
         if key == "max_posterior_var":
@@ -139,7 +170,8 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
                 variance_ratios,
                 target_vals,
                 linestyle="--",
-                linewidth=1.5,
+                linewidth=2.0,
+                marker=None,
                 label="Target variance",
             )
 
@@ -155,7 +187,7 @@ def plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio,
 
         fig.tight_layout()
 
-        out_path = os.path.join(out_dir, f"{stem}_{_sanitize(key)}.pdf")
+        out_path = os.path.join(dataset_dir, f"{stem}_{_sanitize(key)}.pdf")
         fig.savefig(out_path, bbox_inches="tight")  # rcParams ensure no Type 3 fonts
 
         figures.append(fig)
@@ -180,7 +212,17 @@ def main():
 
     data = load_results(args.json_path)
     methods, variance_ratios, per_method, target_var_by_ratio = prepare_data(data)
-    plot_metrics(methods, variance_ratios, per_method, target_var_by_ratio, args.output)
+
+    dataset_name = _dataset_folder_from_json(data, args.json_path)
+
+    plot_metrics(
+        methods,
+        variance_ratios,
+        per_method,
+        target_var_by_ratio,
+        dataset_name=dataset_name,
+        output_base=args.output,
+    )
 
 
 if __name__ == "__main__":
