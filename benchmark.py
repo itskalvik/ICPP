@@ -275,10 +275,10 @@ def main():
     }
 
     for target_var_ratio in args.variance_ratios:
-        var_threshold = max_prior_var * float(target_var_ratio)
+        post_var_threshold = max_prior_var * float(target_var_ratio)
         print(
             f"\n=== Target variance ratio: {target_var_ratio:.2f} "
-            f"(var_threshold={var_threshold:.4f}) ==="
+            f"(post_var_threshold={post_var_threshold:.4f}) ==="
         )
 
         for method in args.methods:
@@ -297,7 +297,7 @@ def main():
 
             s_time = time()
             X_sol, fovs = cmodel.optimize(
-                var_threshold=var_threshold,
+                post_var_threshold=post_var_threshold,
                 return_fovs=True,
                 start_nodes=X_init[None, -1],
                 **kwargs
@@ -413,7 +413,7 @@ def main():
                 "variance_ratio": float(target_var_ratio),
                 "num_placements": int(len(fovs)),
                 "max_prior_var": max_prior_var,
-                "target_var_threshold": var_threshold,
+                "target_post_var_threshold": post_var_threshold,
                 "max_posterior_var": max_post_var,
                 "mse": mse_e,
                 "smse": smse_e,

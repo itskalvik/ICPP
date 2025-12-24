@@ -55,7 +55,7 @@ def prepare_data(data):
         for m in methods:
             run = lookup.get((m, vr))
             if run is not None:
-                target_var_by_ratio[vr] = run["target_var_threshold"]
+                target_var_by_ratio[vr] = run["target_post_var_threshold"]
                 break
 
     for m in methods:
