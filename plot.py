@@ -116,8 +116,8 @@ def plot_metrics(
       - or a filename like 'metrics.pdf': base name used for per-metric PDFs
     """
     metrics = [
-        ("max_posterior_var", "Max posterior variance"),
-        ("num_placements", "Number of sensing locations"),
+        ("max_posterior_var", "Max Posterior Variance"),
+        ("num_placements", "Number of Sensing Locations"),
         ("mse", "Mean MSE"),
         ("smse", "Mean SMSE"),
         ("runtime_sec", "Runtime (s)"),
@@ -175,8 +175,8 @@ def plot_metrics(
                 label="Target variance",
             )
 
-        ax.set_title(f"{label} vs variance ratio")
-        ax.set_xlabel("Variance ratio")
+        ax.set_title(f"{label} vs Variance Ratio")
+        ax.set_xlabel("Variance Ratio")
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
         if "Max" in label:
