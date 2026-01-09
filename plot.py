@@ -117,9 +117,9 @@ def plot_metrics(
     """
     metrics = [
         ("max_posterior_var", "Max posterior variance"),
-        ("num_placements", "Number of placements"),
-        ("mse", "MSE"),
-        ("smse", "SMSE"),
+        ("num_placements", "Number of sensing locations"),
+        ("mse", "Mean MSE"),
+        ("smse", "Mean SMSE"),
         ("runtime_sec", "Runtime (s)"),
         ("distance_m", "Distance (m)"),
     ]
@@ -175,7 +175,7 @@ def plot_metrics(
                 label="Target variance",
             )
 
-        ax.set_title(f"Coverage benchmark: {label} vs variance ratio")
+        ax.set_title(f"{label} vs variance ratio")
         ax.set_xlabel("Variance ratio")
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.3)
