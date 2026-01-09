@@ -192,7 +192,8 @@ def main():
         sc1 = axes[0].imshow(
             y_grid.reshape(x_dim, y_dim).T,
             extent=extent,
-            origin="lower"
+            origin="lower",
+            cmap='plasma'
         )
         axes[0].set_title("Ground Truth")
         axes[0].set_aspect("equal")
@@ -203,7 +204,8 @@ def main():
         sc2 = axes[1].imshow(
             ls_grid.reshape(x_dim, y_dim).T,
             extent=extent,
-            origin="lower"
+            origin="lower",
+            cmap='plasma'
         )
         axes[1].set_title("Lengthscale Predictions")
         axes[1].set_aspect("equal")
@@ -344,7 +346,8 @@ def main():
             sc1 = axes[0].imshow(
                 mean_np.reshape(x_dim, y_dim).T,
                 extent=extent,
-                origin="lower"
+                origin="lower",
+                cmap='plasma'
             )
             axes[0].set_title("Solution GP Predictions")
             axes[0].set_aspect("equal")
@@ -355,10 +358,12 @@ def main():
             sc2 = axes[1].imshow(
                 var_np.reshape(x_dim, y_dim).T,
                 extent=extent,
-                origin="lower"
+                origin="lower",
+                cmap='plasma'
             )
-            axes[1].scatter(X_sol[:, 0], X_sol[:, 1], c="r", s=25)
-            axes[1].plot(X_init[:, 0], X_init[:, 1], c="tab:orange")
+            axes[1].scatter(X_sol[:, 0], X_sol[:, 1], c="r", s=10)
+            axes[1].scatter(X_init[0, 0], X_init[0, 1], c='tab:green', s=25)
+            axes[1].plot(X_init[:, 0], X_init[:, 1], c="tab:green")
             axes[1].plot(X_sol[:, 0], X_sol[:, 1], c="r")
             axes[1].set_title("Solution GP Variance")
             axes[1].set_aspect("equal")
@@ -380,8 +385,8 @@ def main():
                 patch = MplPolygon(
                     list(fov.exterior.coords),
                     closed=True,
-                    facecolor="k",
-                    edgecolor="k",
+                    facecolor="darkviolet",
+                    edgecolor="darkviolet",
                     alpha=0.3,
                 )
                 axes[2].add_patch(patch)
