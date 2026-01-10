@@ -11,7 +11,7 @@ mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["mathtext.fontset"] = "dejavusans"
-mpl.rcParams["text.usetex"] = False
+mpl.rcParams["text.usetex"] = True
 
 # Font sizes
 mpl.rcParams["font.size"] = 14
@@ -151,7 +151,7 @@ def plot_metrics(
         for i, method in enumerate(methods):
             d = per_method[method]
             if "Dist" in method:
-                method_ = "GCBCover with distance budget"
+                method_ = "GCBCover (Dist Budget)"
             else:
                 method_ = method
 
@@ -160,7 +160,7 @@ def plot_metrics(
                 d[key],
                 marker=marker_cycle[i % len(marker_cycle)],
                 linestyle=linestyle_cycle[i % len(linestyle_cycle)],
-                label=method_,
+                label=r'\textsc{' + str(method_) + r'}',
                 **common_plot_kwargs,
             )
 

@@ -10,7 +10,7 @@ mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["mathtext.fontset"] = "dejavusans"
-mpl.rcParams["text.usetex"] = False
+mpl.rcParams["text.usetex"] = True
 
 # Font sizes
 mpl.rcParams["font.size"] = 14
@@ -225,7 +225,7 @@ def main():
             output_dir,
             "lengthscale_groundtruth.png"
         )
-        fig.savefig(lengthscale_fig_path, dpi=300)
+        fig.savefig(lengthscale_fig_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
         print(f"Saved lengthscale figure to {lengthscale_fig_path}")
 
@@ -342,6 +342,14 @@ def main():
                 constrained_layout=True
             )
 
+            if 'Dist' in method:
+                method_name = method.replace('-Dist', ' (Dist Budget)')
+            else:
+                method_name = method
+            fig.text(-0.02, 0.5, r'\textsc{' + str(method_name) + r'}',
+                     va='center', rotation='vertical',
+                     fontsize=18)
+
             # GP mean predictions
             sc1 = axes[0].imshow(
                 mean_np.reshape(x_dim, y_dim).T,
@@ -402,7 +410,7 @@ def main():
                 output_dir,
                 f"{method}_ratio{ratio_str}.png"
             )
-            fig.savefig(fig_filename, dpi=300)
+            fig.savefig(fig_filename, dpi=300, bbox_inches='tight')
             plt.close(fig)
 
             print(
